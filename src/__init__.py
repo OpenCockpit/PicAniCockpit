@@ -16,10 +16,10 @@ def _installHangDump():
         import os
         import signal
         if os.path.isdir(os.path.dirname(HANG_LOG)):
-            _state["hangfile"] = open(HANG_LOG, "a")
+            _state["hangfile"] = open(HANG_LOG, "a", encoding="utf-8")  # pylint: disable=consider-using-with  # must stay open for faulthandler
             faulthandler.register(signal.SIGUSR2, file=_state["hangfile"], all_threads=True)
     except Exception as ex:  # noqa: BLE001
-        print("[PicAniCockpit] hang dump not installed: %r" % (ex,))
+        print(f"[PicAniCockpit] hang dump not installed: {ex!r}")
 
 
 def native():
@@ -28,14 +28,14 @@ def native():
         _state["checked"] = True
         _installHangDump()
         try:
-            from . import _pictrans
+            from . import _pictrans  # pylint: disable=import-self
             ok, text = _pictrans.selftest()
             _state["text"] = text
             _state["module"] = _pictrans if ok else None
         except Exception as ex:  # noqa: BLE001 - any failure must just disable the module
-            _state["text"] = "import failed: %r" % (ex,)
+            _state["text"] = f"import failed: {ex!r}"
             _state["module"] = None
-        print("[PicAniCockpit] native module: %s (%s)" % ("ok" if _state["module"] else "DISABLED", _state["text"]))
+        print(f"[PicAniCockpit] native module: {'ok' if _state['module'] else 'DISABLED'} ({_state['text']})")
     return _state["module"]
 
 

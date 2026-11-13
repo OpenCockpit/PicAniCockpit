@@ -18,17 +18,6 @@ Design and measurements: `MediaCockpit/docs/TransitionEngine-design.md`.
 | `CONTROL/`, `Makefile.am`, `src/Makefile.am`, `scripts/package.sh` | ipk packaging; the Makefile.am files list exactly the files of the ipk (checked with a real `make install` against the ipk contents) |
 | `scripts/` | build / deploy helpers (run in WSL Ubuntu-24.04 unless noted) |
 
-## Workflow
-
-```
-bash scripts/host_test.sh   # WSL: C++ tests with ASan/UBSan + test_effects.py
-bash scripts/build.sh       # WSL: cross-build build/_pictrans.so (enigma2 recipe sysroot)
-bash scripts/package.sh     # WSL: build/enigma2-plugin-systemplugins-picanicockpit_<version>_armv7ahf-neon.ipk
-bash scripts/deploy.sh      # ssh/scp the package files + demo plugin to the receiver
-```
-Restart the GUI after deploying. `Extensions > PicAniCockpit demo` plays every effect on the pictures in `/media/usb/movie`
-(keys in `tools/PicTransDemo/plugin.py`); per-transition statistics go to the enigma2 debug log (`[PicAniCockpit] ...`).
-
 ## Use from MediaCockpit
 
 MediaCockpit imports `Plugins.SystemPlugins.PicAniCockpit` in a try/except. When `available()` is true (module loads and the

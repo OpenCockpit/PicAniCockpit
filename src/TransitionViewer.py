@@ -12,7 +12,7 @@
 import random
 import time
 import weakref
-from enigma import eWidget, ePixmap, ePicLoad, eTimer, ePoint, eSize, gRGB, gPixmapPtr
+from enigma import eWidget, ePixmap, ePicLoad, eTimer, ePoint, eSize, gPixmapPtr
 from Components.GUIComponent import GUIComponent
 from . import native
 from . import Effects
@@ -20,8 +20,9 @@ from . import Effects
 FRAME_MS = 40          # 25 fps
 PRELOAD_STEP_MS = 40   # one texture upload per step (an upload takes ~45 ms at 1080p, ~15 ms at 540p)
 PRELOAD_HALF_STEP_MS = 20
-KB_STEP_MS = 50        # Ken Burns: 20 steps per second. Every step redraws the whole screen (~35 ms on the render thread), so 25 fps was
-                       # never sustained (measured: avg 48-55 ms); a steady 20 fps looks smoother than an irregular 25
+# Ken Burns: 20 steps per second. Every step redraws the whole screen (~35 ms on the render thread), so 25 fps was
+# never sustained (measured: avg 48-55 ms); a steady 20 fps looks smoother than an irregular 25
+KB_STEP_MS = 50
 KB_ZOOM = 0.10         # Ken Burns: the picture grows by this much over the hold time (a pop-free start needs 1.0 at the beginning)
 DEFAULT_DURATION_MS = 1200
 
@@ -29,7 +30,7 @@ IDLE, DECODING, BAKING, PRELOADING, READY, RUNNING = "idle", "decoding", "baking
 
 
 def log(msg):
-    print("[PicAniCockpit] %s" % msg)
+    print(f"[PicAniCockpit] {msg}")
 
 
 class Layer:
@@ -86,9 +87,9 @@ class RectLayer:
     pixmap per (colour, opacity step), created on first use and kept until reset()."""
     STEPS = 32
 
-    def __init__(self, parent, z, native):
+    def __init__(self, parent, z, nat):
         self.layer = Layer(parent, z, blend=True)
-        self.native = native
+        self.native = nat
         self.cache = {}
         self.wanted = False   # show() was called
         self.k = 0            # current opacity step (0 = invisible)
@@ -214,7 +215,7 @@ class TransitionViewer(GUIComponent):
     def setBackground(self, color):
         """color: gRGB or '#AARRGGBB' string; the letterbox colour of decoded pictures."""
         # ePicLoad paints the letterbox with this colour including its alpha byte: force it opaque (enigma2 gRGB alpha 0 = opaque)
-        self.bg = color if isinstance(color, str) else "#ff%06x" % (color.argb() & 0xffffff)
+        self.bg = color if isinstance(color, str) else f"#ff{color.argb() & 0xffffff:06x}"
 
     def isAvailable(self):
         return self.native is not None
@@ -271,7 +272,7 @@ class TransitionViewer(GUIComponent):
         ret = GUIComponent.applySkin(self, desktop, parent)
         sz = self.instance.size()
         self.W, self.H = sz.width(), sz.height()
-        log("widget size %dx%d" % (self.W, self.H))
+        log(f"widget size {self.W}x{self.H}")
         return ret
 
     def postWidgetCreate(self, instance):
@@ -284,7 +285,7 @@ class TransitionViewer(GUIComponent):
         self.pre.geom(0, 0, 4, 2)
         self._layers_ready = True
 
-    def preWidgetRemove(self, instance):
+    def preWidgetRemove(self, instance):  # pylint: disable=unused-argument
         self._timer.stop()
         self._release_timer.stop()
         self._kb_timer.stop()
@@ -329,7 +330,7 @@ class TransitionViewer(GUIComponent):
             if pl.startDecode(job.path):
                 raise RuntimeError("startDecode failed")
         except Exception as ex:  # noqa: BLE001
-            log("decode start failed for %s: %r" % (job.path, ex))
+            log(f"decode start failed for {job.path}: {ex!r}")
             self._failed(job)
 
     def _onDecodedRef(self, ref):
@@ -371,7 +372,7 @@ class TransitionViewer(GUIComponent):
             self._state = BAKING
             self._timer.start(1, True)
         except Exception as ex:  # noqa: BLE001
-            log("decode result failed for %s: %r" % (job.path, ex))
+            log(f"decode result failed for {job.path}: {ex!r}")
             self._failed(job)
 
     def _failed(self, job):
@@ -400,7 +401,7 @@ class TransitionViewer(GUIComponent):
             elif st == RUNNING:
                 self._runStep()
         except Exception as ex:  # noqa: BLE001 - never let an exception escape into the enigma2 main loop
-            log("tick failed in state %s: %r" % (self._state, ex))
+            log(f"tick failed in state {self._state}: {ex!r}")
             self._recover()
 
     def _bakeStep(self):
@@ -462,7 +463,7 @@ class TransitionViewer(GUIComponent):
     def _kbStop(self):
         if self._kb is not None and self._kb_stat[0] > 1:
             n, sm, mx, _, cost = self._kb_stat
-            log("ken burns: %d steps, interval avg/max %.0f/%.0f ms, widget ops avg %.1f ms" % (n, sm / max(1, n - 1), mx, cost / n))
+            log(f"ken burns: {n} steps, interval avg/max {sm / max(1, n - 1):.0f}/{mx:.0f} ms, widget ops avg {cost / n:.1f} ms")
         self._kb = None
         self._kb_timer.stop()
 
@@ -492,7 +493,7 @@ class TransitionViewer(GUIComponent):
             if f < 1.0:
                 self._kb_timer.start(KB_STEP_MS, True)
         except Exception as ex:  # noqa: BLE001
-            log("ken burns failed: %r" % (ex,))
+            log(f"ken burns failed: {ex!r}")
             self._kb = None
 
     def _start(self, job):
@@ -530,9 +531,12 @@ class TransitionViewer(GUIComponent):
             return
         job.effect.end(self)
         n = max(1, job.frames - 1)
-        log("%s fwd=%s q=%s kb=%s: %d frames in %d ms, interval avg/max %.0f/%.0f ms, late %d | decode %.0f bake %.0f preload %.0f ms" % (
-            job.effect.name, job.forward, self.quality, "zoomed" if job.kb_zoomed else "off", job.frames, (time.monotonic() - self._t0) * 1000.0, job.iv_sum / n, job.iv_max, job.late,
-            (job.t_decoded - job.t_created) * 1000.0, (job.t_baked - job.t_decoded) * 1000.0, (job.t_ready - job.t_baked) * 1000.0))
+        kb = "zoomed" if job.kb_zoomed else "off"
+        total = (time.monotonic() - self._t0) * 1000.0
+        log(f"{job.effect.name} fwd={job.forward} q={self.quality} kb={kb}: {job.frames} frames in {total:.0f} ms, "
+            f"interval avg/max {job.iv_sum / n:.0f}/{job.iv_max:.0f} ms, late {job.late} | "
+            f"decode {(job.t_decoded - job.t_created) * 1000.0:.0f} bake {(job.t_baked - job.t_decoded) * 1000.0:.0f} "
+            f"preload {(job.t_ready - job.t_baked) * 1000.0:.0f} ms")
         self._arrived(job)
 
     def _cut(self, job):
@@ -558,7 +562,7 @@ class TransitionViewer(GUIComponent):
             try:
                 cb()
             except Exception as ex:  # noqa: BLE001
-                log("imageChanged callback failed: %r" % (ex,))
+                log(f"imageChanged callback failed: {ex!r}")
 
     def _dropJob(self):
         job = self._job
@@ -581,7 +585,7 @@ class TransitionViewer(GUIComponent):
                 self._cut(job)
                 return
         except Exception as ex:  # noqa: BLE001
-            log("recover failed: %r" % (ex,))
+            log(f"recover failed: {ex!r}")
         self._dropJob()
 
     def _reset(self):
