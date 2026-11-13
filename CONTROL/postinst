@@ -1,5 +1,4 @@
 #!/bin/sh
 # stale byte code of an older install must not shadow the new sources
-rm -rf /usr/lib/enigma2/python/Plugins/SystemPlugins/PicAniCockpit/__pycache__
-echo "PicAniCockpit installed. Restart the GUI (init 4 && init 3) to use it in MediaCockpit."
+echo "PicAniCockpit installed. Restart Enigma2."
 exit 0
